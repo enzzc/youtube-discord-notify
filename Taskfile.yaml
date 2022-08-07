@@ -8,6 +8,8 @@ tasks:
   build:
     cmds:
       - go build -o bin/ydn -v .
+    generates:
+      - bin/ydn
 
   image:
     deps: [build]
@@ -15,6 +17,7 @@ tasks:
       - podman build . -t ydn
     sources:
       - Containerfile
+      - bin/ydn
 
   push:
     deps: [image]
