@@ -45,7 +45,7 @@ func initLastLink() {
 		return
 	}
 	lastLink = string(data)
-	logger.Warnw("Init lastLink",
+	logger.Infow("Init lastLink",
 		"content", lastLink,
 	)
 }
