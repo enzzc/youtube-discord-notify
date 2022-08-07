@@ -23,6 +23,14 @@ spec:
         - name: http
           containerPort: 8042
           protocol: TCP
+
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8042
+          initialDelaySeconds: 10
+          periodSeconds: 120
+
         volumeMounts:
         - mountPath: /var/run
           name: pvc-ydn
