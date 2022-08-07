@@ -1,0 +1,27 @@
+version: '3'
+
+env:
+  CGO_ENABLED: '0'
+  GOAMD64: v3
+
+tasks:
+  build:
+    cmds:
+      - go build -o bin/ydn -v .
+
+  image:
+    deps: [build]
+    cmds:
+      - podman build . -t ydn
+    sources:
+      - Containerfile
+
+  push:
+    deps: [image]
+    cmds:
+      - podman tag ydn $USER/ydn:latest
+      - podman push $USER/ydn:latest docker.io/$USER/ydn --creds=$USER
+
+  rollout:
+    cmds:
+      - kubectl rollout restart deployment/ydn-app

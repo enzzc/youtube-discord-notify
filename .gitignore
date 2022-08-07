@@ -1,0 +1,6 @@
+.env
+load_env
+bin/
+.*~
+.*.swp
+.task/

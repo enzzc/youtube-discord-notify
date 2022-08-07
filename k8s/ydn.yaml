@@ -1,0 +1,33 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ydn-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ydn-app
+  template:
+    metadata:
+      labels:
+        app: ydn-app
+    spec:
+      containers:
+      - name: ydn-server
+        image: sgble/ydn:latest
+        envFrom:
+        - secretRef:
+            name: ydn-app
+        ports:
+        - name: http
+          containerPort: 8042
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /var/run
+          name: pvc-ydn
+
+      volumes:
+      - name: pvc-ydn
+        persistentVolumeClaim:
+          claimName: pvc-ydn
