@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"time"
+	"strings"
 
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
@@ -36,66 +36,63 @@ func init() {
 	logger = l.Sugar()
 }
 
-func initLastLink() {
-	data, err := os.ReadFile(lastLinkPath)
-	if err != nil {
-		logger.Warnw("No file yet",
-			"path", lastLinkPath,
-		)
-		return
-	}
-	lastLink = string(data)
-	logger.Infow("Init lastLink",
-		"content", lastLink,
-	)
-}
-
 func main() {
 	hookEndpoint = os.Getenv("HOOK_ENDPOINT")
 	feedURL = os.Getenv("FEED_URL")
 	botUsername = os.Getenv("BOT_USERNAME")
 	botAvatarURL = os.Getenv("BOT_AVATAR_URL")
 	botMessage = os.Getenv("BOT_MESSAGE")
-	lastLinkPath = os.Getenv("LAST_LINK_PATH")
-	logger.Infow("Init",
-		"feedURL", feedURL,
-		"hookEndpoint", hookEndpoint,
+	stateURI := os.Getenv("STATE_URI")
+
+	var state State
+	var stateType string
+	if strings.HasPrefix(stateURI, "dynamodb://") {
+		table, _ := strings.CutPrefix(stateURI, "dynamodb://")
+		state = NewDynamoDBStoreWithEnvCreds(table)
+		stateType = "DynamoDB table " + table
+	} else {
+		state = NewFileState(stateURI)
+		stateType = "LocalFile " + stateURI
+	}
+
+	previous, _ := state.Get()
+	logger.Infow("Previous",
+		"link", previous,
+		"source", "State "+stateType,
 	)
-	initLastLink()
-	go runHealthServer()
-	loop(15 * time.Minute)
+
+	current, _ := fetchLastLink(feedURL)
+	logger.Infow("Current",
+		"link", current,
+		"source", "YouTube RSS",
+	)
+
+	if previous != current {
+		sendNotif(current)
+		state.Set(current)
+	}
+
 }
 
-func loop(interval time.Duration) {
-	for {
-		t0 := time.Now()
+func fetchLastLink(feedURL string) (string, error) {
+	fp := gofeed.NewParser()
+	feed, err := fp.ParseURL(feedURL)
 
-		fp := gofeed.NewParser()
-		feed, err := fp.ParseURL(feedURL)
-
-		if err != nil {
-			logger.Warnw("Failed parsing feed",
-				"feedURL", feedURL,
-				"err", err,
-			)
-		} else {
-			logger.Infow("Feed fetched",
-				"title", feed.Title,
-			)
-			if len(feed.Items) > 0 {
-				link := feed.Items[0].Link
-				if link != lastLink {
-					logger.Infow("New item",
-						"link", link,
-					)
-					sendNotif(link)
-					saveLink(link)
-					lastLink = link
-				}
-			}
-		}
-		time.Sleep(interval - time.Since(t0))
+	if err != nil {
+		logger.Warnw("Failed parsing feed",
+			"feedURL", feedURL,
+			"err", err,
+		)
+		return "", err
 	}
+
+	logger.Infow("Feed fetched",
+		"title", feed.Title,
+	)
+	if len(feed.Items) > 0 {
+		return feed.Items[0].Link, nil
+	}
+	return "", nil
 }
 
 func sendNotif(link string) {
@@ -134,21 +131,6 @@ func sendNotif(link string) {
 	logger.Infow("Payload sent!",
 		"json", string(jsonBuf),
 	)
-}
-
-func saveLink(link string) {
-	err := os.WriteFile(lastLinkPath, []byte(link), 0644)
-	if err != nil {
-		logger.Errorw("Error writing file",
-			"path", lastLinkPath,
-		)
-		return
-	}
-	logger.Infow("Write file",
-		"path", lastLinkPath,
-		"content", link,
-	)
-
 }
 
 func runHealthServer() {
