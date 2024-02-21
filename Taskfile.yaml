@@ -23,10 +23,8 @@ tasks:
     deps: [image]
     cmds:
       - podman tag ydn $USER/ydn:latest
+      - podman tag ydn $USER/ydn:v2
       - podman push $USER/ydn:latest docker.io/$USER/ydn --creds=$USER
-    preconditions:
-      - sh: podman images | grep localhost/sgble/ydn
-        msg: Try "task image" first
 
   rollout:
     cmds:
