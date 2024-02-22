@@ -61,7 +61,7 @@ func main() {
 		"source", "State "+stateType,
 	)
 
-	current, _ := fetchLastLink(feedURL)
+	current, _ := getCurrentLinkFromFeed(feedURL)
 	logger.Infow("Current",
 		"link", current,
 		"source", "YouTube RSS",
@@ -74,7 +74,7 @@ func main() {
 
 }
 
-func fetchLastLink(feedURL string) (string, error) {
+func getCurrentLinkFromFeed(feedURL string) (string, error) {
 	fp := gofeed.NewParser()
 	feed, err := fp.ParseURL(feedURL)
 
