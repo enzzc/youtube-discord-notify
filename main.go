@@ -132,16 +132,3 @@ func sendNotif(link string) {
 		"json", string(jsonBuf),
 	)
 }
-
-func runHealthServer() {
-	http.HandleFunc("/healthz", healthzHandler)
-	http.ListenAndServe(":8042", nil)
-}
-
-func healthzHandler(w http.ResponseWriter, req *http.Request) {
-	w.Write([]byte("OK."))
-	logger.Infow("Health probe OK.",
-		"status", "OK",
-		"lastLink", lastLink,
-	)
-}
