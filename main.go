@@ -50,6 +50,11 @@ func main() {
 		table, _ := strings.CutPrefix(stateURI, "dynamodb://")
 		state = NewDynamoDBStoreWithEnvCreds(table)
 		stateType = "DynamoDB table " + table
+		defer func() {
+			logger.Infow("DynamoDB Consumed",
+				"read_units", state.(*DynamoDBState).Consumed,
+			)
+		}()
 	} else {
 		state = NewFileState(stateURI)
 		stateType = "LocalFile " + stateURI
@@ -58,20 +63,19 @@ func main() {
 	previous, _ := state.Get()
 	logger.Infow("Previous",
 		"link", previous,
-		"source", "State "+stateType,
+		"source", stateType,
 	)
 
 	current, _ := getCurrentLinkFromFeed(feedURL)
 	logger.Infow("Current",
 		"link", current,
-		"source", "YouTube RSS",
+		"source", "RSS",
 	)
 
 	if previous != current {
 		sendNotif(current)
 		state.Set(current)
 	}
-
 }
 
 func getCurrentLinkFromFeed(feedURL string) (string, error) {

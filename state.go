@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	dtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 type State interface {
@@ -43,8 +44,9 @@ func (s *FileState) Get() (string, error) {
 }
 
 type DynamoDBState struct {
-	client *dynamodb.Client
-	table  *string
+	client   *dynamodb.Client
+	table    *string
+	Consumed float64
 }
 
 func NewDynamoDBStoreWithEnvCreds(table string) *DynamoDBState {
@@ -88,9 +90,10 @@ func (s *DynamoDBState) Get() (string, error) {
 	}
 	key, _ := attributevalue.MarshalMap(keys)
 	input := &dynamodb.GetItemInput{
-		TableName:       s.table,
-		AttributesToGet: []string{"link"},
-		Key:             key,
+		TableName:              s.table,
+		AttributesToGet:        []string{"link"},
+		Key:                    key,
+		ReturnConsumedCapacity: dtypes.ReturnConsumedCapacityTotal,
 	}
 	itemOutput, err := s.client.GetItem(context.TODO(), input)
 	if err != nil {
@@ -99,6 +102,7 @@ func (s *DynamoDBState) Get() (string, error) {
 	var item map[string]string
 	attributevalue.UnmarshalMap(itemOutput.Item, &item)
 	link, ok := item["link"]
+	s.Consumed += *itemOutput.ConsumedCapacity.CapacityUnits
 	if !ok {
 		return "", nil
 	}
