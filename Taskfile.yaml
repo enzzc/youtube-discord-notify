@@ -23,7 +23,7 @@ tasks:
     deps: [image]
     cmds:
       - podman tag ydn $USER/ydn:latest
-      - podman tag ydn $USER/ydn:v2
+      - podman tag ydn $USER/ydn:$(date +"%Y%m%d-%H%M%S")
       - podman push $USER/ydn:latest docker.io/$USER/ydn --creds=$USER
 
   rollout:
