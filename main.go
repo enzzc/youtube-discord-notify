@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
@@ -72,23 +73,37 @@ func main() {
 		stateType = "LocalFile " + stateURI
 	}
 
-	previous, err := state.Get()
-	if err != nil {
-		logger.Fatalw(err.Error())
-	}
-	logger.Infow("Previous",
-		"link", previous,
-		"source", stateType,
-	)
+	var previous string
+	var current string
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	current, err := getCurrentLinkFromFeed(feedURL)
-	if err != nil {
-		logger.Fatalw(err.Error())
-	}
-	logger.Infow("Current",
-		"link", current,
-		"source", "RSS",
-	)
+	go func() {
+		var err error
+		previous, err = state.Get()
+		if err != nil {
+			logger.Fatalw(err.Error())
+		}
+		logger.Infow("Previous",
+			"link", previous,
+			"source", stateType,
+		)
+		wg.Done()
+	}()
+
+	go func() {
+		var err error
+		current, err = getCurrentLinkFromFeed(feedURL)
+		if err != nil {
+			logger.Fatalw(err.Error())
+		}
+		logger.Infow("Current",
+			"link", current,
+			"source", "RSS",
+		)
+		wg.Done()
+	}()
+	wg.Wait()
 
 	if previous != current {
 		if err := sendNotif(current); err != nil {
