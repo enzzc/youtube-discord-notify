@@ -21,14 +21,13 @@ type FileState struct {
 	path string
 }
 
-func NewFileState(path string) *FileState {
-	_, err := os.Stat(path)
-	if err != nil {
-		os.Create(path)
+func NewFileState(path string) (*FileState, error) {
+	if _, err := os.Stat(path); err != nil {
+		if _, err := os.Create(path); err != nil {
+			return nil, err
+		}
 	}
-	return &FileState{
-		path: path,
-	}
+	return &FileState{path}, nil
 }
 
 func (s *FileState) Set(value string) error {
@@ -49,7 +48,7 @@ type DynamoDBState struct {
 	Consumed float64
 }
 
-func NewDynamoDBStoreWithEnvCreds(table string) *DynamoDBState {
+func NewDynamoDBStoreWithEnvCreds(table string) (*DynamoDBState, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion("eu-west-3"),
 		config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
@@ -61,13 +60,13 @@ func NewDynamoDBStoreWithEnvCreds(table string) *DynamoDBState {
 		}),
 	)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	client := dynamodb.NewFromConfig(cfg)
 	return &DynamoDBState{
 		client: client,
 		table:  aws.String(table),
-	}
+	}, nil
 }
 
 func (s *DynamoDBState) Set(value string) error {

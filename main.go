@@ -44,37 +44,59 @@ func main() {
 	botMessage = os.Getenv("BOT_MESSAGE")
 	stateURI := os.Getenv("STATE_URI")
 
+	if len(stateURI) == 0 {
+		logger.Fatalw("STATE_URI is not specified")
+	}
+
 	var state State
 	var stateType string
 	if strings.HasPrefix(stateURI, "dynamodb://") {
+		var err error
 		table, _ := strings.CutPrefix(stateURI, "dynamodb://")
-		state = NewDynamoDBStoreWithEnvCreds(table)
-		stateType = "DynamoDB table " + table
+		state, err = NewDynamoDBStoreWithEnvCreds(table)
+		if err != nil {
+			logger.Fatalw(err.Error())
+		}
 		defer func() {
 			logger.Infow("DynamoDB Consumed",
 				"read_units", state.(*DynamoDBState).Consumed,
 			)
 		}()
+		stateType = "DynamoDB table " + table
 	} else {
-		state = NewFileState(stateURI)
+		var err error
+		state, err = NewFileState(stateURI)
+		if err != nil {
+			logger.Fatalw(err.Error())
+		}
 		stateType = "LocalFile " + stateURI
 	}
 
-	previous, _ := state.Get()
+	previous, err := state.Get()
+	if err != nil {
+		logger.Fatalw(err.Error())
+	}
 	logger.Infow("Previous",
 		"link", previous,
 		"source", stateType,
 	)
 
-	current, _ := getCurrentLinkFromFeed(feedURL)
+	current, err := getCurrentLinkFromFeed(feedURL)
+	if err != nil {
+		logger.Fatalw(err.Error())
+	}
 	logger.Infow("Current",
 		"link", current,
 		"source", "RSS",
 	)
 
 	if previous != current {
-		sendNotif(current)
-		state.Set(current)
+		if err := sendNotif(current); err != nil {
+			logger.Fatalw(err.Error())
+		}
+		if err := state.Set(current); err != nil {
+			logger.Fatalw(err.Error())
+		}
 	}
 }
 
@@ -99,7 +121,7 @@ func getCurrentLinkFromFeed(feedURL string) (string, error) {
 	return "", nil
 }
 
-func sendNotif(link string) {
+func sendNotif(link string) error {
 	message := fmt.Sprintf(botMessage, link)
 	jsonBuf, _ := json.Marshal(struct {
 		Username  string `json:"username"`
@@ -113,26 +135,22 @@ func sendNotif(link string) {
 
 	req, _ := http.NewRequest("POST", hookEndpoint, bytes.NewBuffer(jsonBuf))
 	req.Header.Set("Content-Type", "application/json")
-	fmt.Printf("%+v\n", req)
 	client := &http.Client{}
 	resp, err := client.Do(req)
-
 	if err != nil {
-		logger.Errorw("Failed POSTing data",
-			"err", err,
-		)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 204 {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
 		logger.Warnw("Return code is not 204",
 			"statusCode", resp.StatusCode,
 			"body", string(body),
 		)
-		return
+		return err
 	}
 	logger.Infow("Payload sent!",
 		"json", string(jsonBuf),
 	)
+	return nil
 }
